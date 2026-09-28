@@ -1,0 +1,205 @@
+<div data-elementor-type="wp-post" data-elementor-id="5137" class="elementor elementor-5137" data-elementor-post-type="post">
+				<div class="elementor-element elementor-element-60920cd e-flex e-con-boxed e-con e-parent" data-id="60920cd" data-element_type="container" data-e-type="container">
+					<div class="e-con-inner">
+				<div class="elementor-element elementor-element-b6fb033 elementor-widget elementor-widget-text-editor" data-id="b6fb033" data-element_type="widget" data-e-type="widget" data-widget_type="text-editor.default">
+				<div class="elementor-widget-container">
+									<p>&nbsp;</p><p>Nowadays, it is (rightfully) impossible to put an embedded device into the market without comprehensive embedded device security measures. Most new devices store private data that we do not want to see leaked in dark corners of the Internet. We also want to avoid our device ending up as part of a botnet.</p><p>Linux has a large set of tools to help us with security. What has historically been lacking is a simple, off-the-shelf way to integrate these tools into a secure-by-default configuration. This post will demonstrate how modern tools simplify deployments while ensuring strong security.</p><h3>Embedded Device Security Scope</h3><p>When talking about embedded system security, we should of course also talk about what we are actually trying to protect again. It is impossible to generalize a threat model over all possible embedded devices, but we can try to collect some typical requirements.</p><p>Usually, we will find two variants of data on a system:</p><ul><li aria-level="1">Fixed binaries and libraries forming the operating system</li><li aria-level="1">And variable configuration and user-data that is changed at the runtime</li></ul><p>For the operating system we need to ensure the integrity of the factory image. This guards against supply chain attacks and the booting of non-authorized software. However, for the purposes of this blog, we won’t consider the operating system binaries as confidential.</p><p>We do consider the dynamic configuration and user data to be confidential. This data is only generated during the runtime of the device and is not flashed at the factory or replaced during updates. This data we definitively want to protect against being read out on stolen devices.</p><p>There are way more options and scenarios that might be relevant to your specific device. But this gives us a good basis to build on!</p><h3>Filesystem configuration</h3><p>Sounds like a plan? Let’s move to execution…</p><p>Linux allows very flexible filesystem configurations. For a typical embedded device it usually boils down to some places in `/etc`, `/var` and `/home` being required to be writable while the rest can remain an immutable image.</p><p>We can implement the root file system (`/`) as immutable and mount in the various writable locations. However, managing multiple exceptions from the norm is cumbersome. Instead, there is a much easier alternative: make `/` writable and mount a readonly `/usr` partition. `/usr` is where all the system files are stored. They are all immutable and any other files can be automatically populated on the first boot. This allows us to drop the `/` partition from the factory image and only ship the&nbsp; `/usr` part.</p><p>This might seem like a slightly counter intuitive approach at first. But it makes managing the writable partition a lot easier. Having to only manage two partitions without any symlinks between them is the most obvious benefit. It also makes the cut between the different requirements for the two partitions easier. One will require integrity checks and the other partition will require encryption.</p><p>Key management also becomes easier (and more secure) if we can create the keys on the device on first boot. Incorporating per-device encryption into a deployment that happens from a single factory image is a lot simpler if we create the encrypted partitions on the device. Otherwise we will find ourselves having to do some awkward in-place re-encryption of these partitions. Another thing that also becomes easier with partitions created at first-boot is a factory reset mechanism. We can simply toss out the encrypted partitions, delete the keys and start fresh by recreating them.</p><p>Now, the critical reader may be wondering how we survive the first boot attempt without having a `/` filesystem. Linux really needs it for switching to user-space eventually. Thus, we need to find a replacement. An initrd filesystem will come to rescue—a minimal filesystem. Don’t worry, setting that one up will be a lot easier than one might assume.</p><h3>Securing Embedded Device Operating System</h3><p>Dealing with an immutable filesystem makes integrity checks fairly easy. We can simply guard the entire partition block by putting it into a dm-verity partition. This builds a hash tree over the blocks of the filesystem leading to eventually a single root-hash that can be used to verify the integrity of the entire hash tree and thus also the filesystem.</p><p>Now, we still need to somehow sign that root-hash to ensure it originates from our trusted build process. This is typically the part where the complexity starts to creep in. One option is to bake the hash into the kernel commandline by appending `usrhash=&lt;root-hash&gt;`, which then will be signed together with the other boot artifacts. This seems straightforward, but complicates the build process as we now need to build the `/usr` partition before injecting the `usrhash` into the kernel commandline–or more likely: into a Unified Kernel Image (<a href="https://uapi-group.org/specifications/specs/unified_kernel_image/">UKI</a>). This leads to our `/boot` partition depending on the build of `/usr` or requires some patching of the built image to inject the `usrhash=` option.</p><p>The alternative is to have some metadata elsewhere that contains the hash and a signature over it. People have come up with various ways to do this. But lately, a group of systemd and Linux distribution maintainers has been formed to define standards for this. The uapi-group now provides <a href="https://uapi-group.org/specifications/specs/discoverable_partitions_specification/#verity">a standard</a> for securely auto-discovering the root-hash and its signature. Even better: We do not have to bother with the whole dm-verity setup at all. `systemd-repart` has support for it and will automate the whole thing for us. Systemd also comes with its counterpart `systemd-gpt-auto-generator` that does the discovery and mounting for us.</p><h3>Side topic: systemd-repart</h3><p>`systemd-repart` at its core does exactly what the name suggests: It allows repartitioning of a disk based on some simple configuration files.</p><p>Given the following configuration:</p>								</div>
+				</div>
+				<div class="elementor-element elementor-element-10a2300 elementor-widget elementor-widget-code-highlight" data-id="10a2300" data-element_type="widget" data-e-type="widget" data-widget_type="code-highlight.default">
+				<div class="elementor-widget-container">
+							<div class="prismjs-default copy-to-clipboard ">
+			<pre data-line="" class="highlight-height language-javascript line-numbers">				<code readonly="true" class="language-javascript">
+					<xmp># 00-esp.conf
+[Partition]
+Type=esp
+ 
+# 20-root.conf
+[Partition]
+Type=root
+Weight=1000
+ 
+# 30-home.conf
+[Partition]
+Type=home
+Format=btrfs
+SizeMinBytes=1G
+Weight=2000</xmp>
+				</code>
+			</pre>
+		</div>
+						</div>
+				</div>
+				<div class="elementor-element elementor-element-fca9b99 elementor-widget elementor-widget-text-editor" data-id="fca9b99" data-element_type="widget" data-e-type="widget" data-widget_type="text-editor.default">
+				<div class="elementor-widget-container">
+									<p>&nbsp;It will compare which partitions exist on the booted disk to the configuration and create the missing ones. The <a href="https://www.freedesktop.org/software/systemd/man/latest/repart.d.html">configuration format</a> is simple, yet powerful.</p><p>But this is not even the best feature of `systemd-repart`. It can also create disk images from scratch!</p><p>An example:</p>								</div>
+				</div>
+				<div class="elementor-element elementor-element-5d7c7fc elementor-widget elementor-widget-code-highlight" data-id="5d7c7fc" data-element_type="widget" data-e-type="widget" data-widget_type="code-highlight.default">
+				<div class="elementor-widget-container">
+							<div class="prismjs-default copy-to-clipboard ">
+			<pre data-line="" class="highlight-height language-javascript line-numbers">				<code readonly="true" class="language-javascript">
+					<xmp># 00-esp.conf
+[Partition]
+Type=esp
+Format=vfat
+CopyFiles=/boot:/
+CopyFiles=/efi:/
+SizeMinBytes=512M
+SizeMaxBytes=512M
+
+# mkosi.repart/10-usr.conf
+[Partition]
+Type=usr
+CopyFiles=/usr:/
+Verity=data
+VerityMatchKey=usr
+Minimize=guess
+
+# mkosi.repart/20-usr-verity.conf
+[Partition]
+Type=usr-verity
+Verity=hash
+VerityMatchKey=usr
+Minimize=best
+
+# mkosi.repart/30-usr-verity-sig.conf
+[Partition]
+Type=usr-verity-sig
+Verity=signature
+VerityMatchKey=usr
+Minimize=best</xmp>
+				</code>
+			</pre>
+		</div>
+						</div>
+				</div>
+				<div class="elementor-element elementor-element-a080547 elementor-widget elementor-widget-text-editor" data-id="a080547" data-element_type="widget" data-e-type="widget" data-widget_type="text-editor.default">
+				<div class="elementor-widget-container">
+									<p>With this config, we can call:</p>								</div>
+				</div>
+				<div class="elementor-element elementor-element-698851b elementor-widget elementor-widget-code-highlight" data-id="698851b" data-element_type="widget" data-e-type="widget" data-widget_type="code-highlight.default">
+				<div class="elementor-widget-container">
+							<div class="prismjs-default copy-to-clipboard ">
+			<pre data-line="" class="highlight-height language-javascript line-numbers">				<code readonly="true" class="language-javascript">
+					<xmp>systemd-repart \
+        --root=”/path/to/our/prepared/root/filesystem” \
+        --empty=create --size=auto --offline=yes \
+        --private-key=<db.key> \
+        --certificate=<db.crt> \
+        output.img</xmp>
+				</code>
+			</pre>
+		</div>
+						</div>
+				</div>
+				<div class="elementor-element elementor-element-e5fd759 elementor-widget elementor-widget-text-editor" data-id="e5fd759" data-element_type="widget" data-e-type="widget" data-widget_type="text-editor.default">
+				<div class="elementor-widget-container">
+									<p>It will handle all the dm-verity setup, signing and assign the well-known GPT partition UUIDs that `systemd-gpt-auto-generator` can detect to auto-mount.</p><p><img fetchpriority="high" decoding="async" class="aligncenter size-full wp-image-5171" src="/wp-content/uploads/2025/08/Making-Embedded-Devices-easier-and-more-secure.png" alt="" width="782" height="434" srcset="/wp-content/uploads/2025/08/Making-Embedded-Devices-easier-and-more-secure.png 782w, /wp-content/uploads/2025/08/Making-Embedded-Devices-easier-and-more-secure-300x166.png 300w, /wp-content/uploads/2025/08/Making-Embedded-Devices-easier-and-more-secure-768x426.png 768w" sizes="(max-width: 782px) 100vw, 782px"></p><p><i><a href="https://mermaid.live/edit#pako:eNqVU8GO0zAQ_RVrpKqXJnTdppvmwIVdJARISMteaDi4tZNYG9uVPYYNUf8dOw3tFpYV-JBknl9mPG-ee9gZLqCAyaSXWmJB-ik2QolpQaac2YcpOZDDZFLqUlet-b5rmEXy-abUJCznt7Vl-4ZYY7ByXNrNJyv2zAo-Ql-PxLi2AdiU8EpUsoQnuHc2wuF1goXmvxWo2A6N7RKpWC02Y5RKVT9JdPv23TngKvkmrMRuzE0Swhmyi8onTtIw15yJMSJohfgL28n6TA6BZuiteOn0UrN2PPvt455pHgQKMqFEaTRpWWc8XnZCN-HxXHX6zw3R_-qIvtRSXK1_cJETCD40YMmH-_d3fzZ9sgJJUuI6h0LxZDAFEoZk62XLCUolSJq8vpxrNFlMcQE-kyZIVknrcLDUMc1ZYJiBElYxyYOr-5iwhMHRJRThk4uK-RZLKPUhUJlHc9fpHRRovZiBNb5uoKhY60Lk90FicSNZGKM6oWF-X4xRv36pbSw17lkRpXljvEYo6FVGBzoUPTxCsU7zK7pc0nW2zmmWLcJmB0UAUrrKF_P5Il_mq-vV8jCDH0OBeZpfZzMQXAY9Ph4v6nBfDz8BPw0teQ">Source</a></i></p><p>With this, we will get our `/usr` burned into the factory image and then use `systemd-repart` again on the device to fill in the remaining parts.</p><h3>Protecting Writable Data in Embedded Device Security</h3><p>With the static part out of the way, let’s look at the dynamic `/` partition. We want to protect against this being dumped on stolen devices. So we will need some kind of encryption.</p><p>Asking a user for a pincode is an easy way to solve this. But this becomes impractical for headless appliances. Instead we will need some kind of secure mechanism to only release some key material when the system is in a well-defined state. Various chip vendors have provided such mechanisms for a while. But securely implementing those mechanisms is challenging and often requires getting an NDA to even peek at the relevant reference manual.</p><p>Luckily, again we have a standard to reach for: <a href="https://en.wikipedia.org/wiki/Trusted_Platform_Module">Trusted Platform Modules</a> (TPMs). What sounds like a specific hardware solution is actually more an API than actual hardware. TPMs can also be implemented in firmware solutions that are running in isolated environments on the main CPU. On embedded devices where we can have great control over the kind of firmware that we run, firmware TPMs can be a great way to get a standard compliant TPM solution without needing any actual TPM hardware.</p><p>Covering the TPM 2.0 standard in detail is beyond the scope of this blog post. What matters is that the standard gives us a mechanism to bind keys to specific system states. These keys are then only accessible in those specific states. TPM and UEFI work well together and there are registers reserved for various states of the firmware to measure into. uapi-group defines <a href="https://uapi-group.org/specifications/specs/linux_tpm_pcr_registry/">a list of registers and their allocation</a> that are relevant for a typical Linux system.</p><p>For the scope of this post we will only look at the register named “PCR #7”. This register accumulates all the state that impacts the secure boot state. It allows us to bind to the keys and signatures that were used to confirm the various boot components, effectively giving us a way to only reveal a key when the earlier chain was verified successfully. This guards the encryption keys as long as nothing can read the TPM after secure boot. With firmware TPMs that means that our keys are safe if our secure boot mechanism is safe.</p><p>How to set all of this up? Easy: Use `systemd-repart`!</p>								</div>
+				</div>
+				<div class="elementor-element elementor-element-2e7db0f elementor-widget elementor-widget-code-highlight" data-id="2e7db0f" data-element_type="widget" data-e-type="widget" data-widget_type="code-highlight.default">
+				<div class="elementor-widget-container">
+							<div class="prismjs-default copy-to-clipboard ">
+			<pre data-line="" class="highlight-height language-javascript line-numbers">				<code readonly="true" class="language-javascript">
+					<xmp>[Partition]
+Type=root
+Encrypt=tpm2</xmp>
+				</code>
+			</pre>
+		</div>
+						</div>
+				</div>
+				<div class="elementor-element elementor-element-086fb46 elementor-widget elementor-widget-text-editor" data-id="086fb46" data-element_type="widget" data-e-type="widget" data-widget_type="text-editor.default">
+				<div class="elementor-widget-container">
+									<p>`systemd-repart` will automatically create an encrypted partition, enroll it with the TPM and create a filesystem within. The filesystem will have the right partition UUID set so that it can be automatically detected by a systemd-based initrd.</p><h4>Putting it together</h4><p>Let’s put it all together. We will use <a href="https://mkosi.systemd.io/">mkosi</a> to build our factory image. It integrates well with systemd tooling and saves us from building everything from scratch.</p><p>We will use a simple config to build a custom image based on Fedora packages:</p>								</div>
+				</div>
+				<div class="elementor-element elementor-element-45b5e9e elementor-widget elementor-widget-code-highlight" data-id="45b5e9e" data-element_type="widget" data-e-type="widget" data-widget_type="code-highlight.default">
+				<div class="elementor-widget-container">
+							<div class="prismjs-default copy-to-clipboard ">
+			<pre data-line="" class="highlight-height language-javascript line-numbers">				<code readonly="true" class="language-javascript">
+					<xmp>[Distribution]
+Distribution=fedora
+Architecture=arm64
+
+[Content]
+Packages=systemd-boot,kernel-core
+InitrdPackages=systemd-repart
+
+Bootable=yes
+
+KernelCommandLine=
+    # Only allow verity+signed /usr and encrypted auto-mounts
+    systemd.image_policy=usr=verity+signed:root=encrypted
+    # disable emergency shells
+    rd.systemd.mask=emergency.service systemd.mask=emergency.service
+    rd.systemd.mask=rescue.service systemd.mask=rescue.service
+
+# INSECURE: Enable password less root for testing :)
+RootPassword=hashed:
+Autologin=yes
+
+[Validation]
+SecureBoot=yes
+Verity=yes
+VerityKey=mkosi.key
+VerityCertificate=mkosi.crt
+
+[Runtime]
+RuntimeSize=2G</xmp>
+				</code>
+			</pre>
+		</div>
+						</div>
+				</div>
+				<div class="elementor-element elementor-element-b946981 elementor-widget elementor-widget-text-editor" data-id="b946981" data-element_type="widget" data-e-type="widget" data-widget_type="text-editor.default">
+				<div class="elementor-widget-container">
+									<p>Then we can drop our partition config into `mkosi.repart/` (this will define the factory image partition layout). The one I showed in the earlier section will do fine.</p><p>Finally, we can drop the runtime partition config into `mkosi.extra` (which will be added into the image):</p>								</div>
+				</div>
+				<div class="elementor-element elementor-element-d32feb1 elementor-widget elementor-widget-code-highlight" data-id="d32feb1" data-element_type="widget" data-e-type="widget" data-widget_type="code-highlight.default">
+				<div class="elementor-widget-container">
+							<div class="prismjs-default copy-to-clipboard ">
+			<pre data-line="" class="highlight-height language-javascript line-numbers">				<code readonly="true" class="language-javascript">
+					<xmp>==> mkosi.extra/usr/lib/repart.d/00-esp.conf <==
+[Partition]
+Type=esp
+
+==> mkosi.extra/usr/lib/repart.d/10-usr.conf <==
+[Partition]
+Type=usr
+
+==> mkosi.extra/usr/lib/repart.d/20-usr-verity.conf <==
+[Partition]
+Type=usr-verity
+
+==> mkosi.extra/usr/lib/repart.d/30-usr-verity.conf <==
+[Partition]
+Type=usr-verity-sig
+
+==> mkosi.extra/usr/lib/repart.d/40-root.conf <==
+[Partition]
+Type=root
+Encrypt=tpm2</xmp>
+				</code>
+			</pre>
+		</div>
+						</div>
+				</div>
+				<div class="elementor-element elementor-element-c6a5467 elementor-widget elementor-widget-text-editor" data-id="c6a5467" data-element_type="widget" data-e-type="widget" data-widget_type="text-editor.default">
+				<div class="elementor-widget-container">
+									<p>We can build and boot the system with</p>								</div>
+				</div>
+				<div class="elementor-element elementor-element-a4dc00b elementor-widget elementor-widget-code-highlight" data-id="a4dc00b" data-element_type="widget" data-e-type="widget" data-widget_type="code-highlight.default">
+				<div class="elementor-widget-container">
+							<div class="prismjs-default copy-to-clipboard ">
+			<pre data-line="" class="highlight-height language-javascript line-numbers">				<code readonly="true" class="language-javascript">
+					<xmp>mkosi build && mkosi vm</xmp>
+				</code>
+			</pre>
+		</div>
+						</div>
+				</div>
+				<div class="elementor-element elementor-element-3764961 elementor-widget elementor-widget-text-editor" data-id="3764961" data-element_type="widget" data-e-type="widget" data-widget_type="text-editor.default">
+				<div class="elementor-widget-container">
+									<p>provide the example config in a repo: <a href="https://github.com/riscstar/blogpost-secure-boot-userspace">https://github.com/riscstar/blogpost-secure-boot-userspace</a></p><p><a href="https://www.cnx-software.com/2025/08/15/embedded-device-security-protecting-linux-systems-with-modern-tools/">See original article</a>&nbsp;</p><p>&nbsp;</p>								</div>
+				</div>
+					</div>
+				</div>
+				</div>

@@ -1,0 +1,62 @@
+---
+// Blog card — mirrors Elementor loop-item template 559.
+import { type Post, postUrl, fmtShort, dayUrl, shortExcerpt, categoryClasses } from '../lib/blog';
+interface Props { post: Post; eager?: boolean }
+const { post, eager = false } = Astro.props;
+const d = post.data;
+const url = postUrl(post);
+---
+<div data-elementor-type="loop-item" data-elementor-id="559" class={`elementor elementor-559 e-loop-item post type-post status-publish format-standard has-post-thumbnail hentry ${categoryClasses(post)}`} data-elementor-post-type="elementor_library" data-custom-edit-handle="1">
+<div class="elementor-element elementor-element-ef6de95 e-flex e-con-boxed e-con e-parent" data-id="ef6de95" data-element_type="container" data-e-type="container">
+<div class="e-con-inner">
+<div class="elementor-element elementor-element-c0f1061 e-con-full e-flex e-con e-child" data-id="c0f1061" data-element_type="container" data-e-type="container">
+<div class="elementor-element elementor-element-5714dce elementor-widget elementor-widget-image" data-id="5714dce" data-element_type="widget" data-e-type="widget" data-widget_type="image.default">
+<div class="elementor-widget-container">
+<a href={url}>
+<img fetchpriority={eager ? 'high' : undefined} loading={eager ? undefined : 'lazy'} decoding="async" width={d.imageWidth} height={d.imageHeight} src={d.image} class="attachment-full size-full" alt={d.imageAlt} />
+</a>
+</div>
+</div>
+<div class="elementor-element elementor-element-0bbd9f5 elementor-widget elementor-widget-theme-post-title elementor-page-title elementor-widget-heading" data-id="0bbd9f5" data-element_type="widget" data-e-type="widget" data-widget_type="theme-post-title.default">
+<div class="elementor-widget-container">
+<p class="elementor-heading-title elementor-size-default"><a href={url}>{d.title}</a></p>
+</div>
+</div>
+<div class="elementor-element elementor-element-d042771 elementor-align-left elementor-widget elementor-widget-post-info" data-id="d042771" data-element_type="widget" data-e-type="widget" data-widget_type="post-info.default">
+<div class="elementor-widget-container">
+<ul class="elementor-inline-items elementor-icon-list-items elementor-post-info">
+<li class="elementor-icon-list-item elementor-repeater-item-438fe81 elementor-inline-item" itemprop="author">
+<a href={`/blog/author/${d.authorSlug}/`}>
+<span class="elementor-icon-list-text elementor-post-info__item elementor-post-info__item--type-author">
+<span class="elementor-post-info__item-prefix">By:</span>
+{d.author} </span>
+</a>
+</li>
+<li class="elementor-icon-list-item elementor-repeater-item-22d4471 elementor-inline-item" itemprop="datePublished">
+<a href={dayUrl(d.date)}>
+<span class="elementor-icon-list-text elementor-post-info__item elementor-post-info__item--type-date">
+<time>{fmtShort(d.date)}</time> </span>
+</a>
+</li>
+</ul>
+</div>
+</div>
+<div class="elementor-element elementor-element-dabfad4 elementor-hidden-desktop elementor-hidden-tablet elementor-hidden-mobile elementor-widget elementor-widget-theme-post-excerpt" data-id="dabfad4" data-element_type="widget" data-e-type="widget" data-widget_type="theme-post-excerpt.default">
+<div class="elementor-widget-container">
+{shortExcerpt(post)} </div>
+</div>
+</div>
+<div class="elementor-element elementor-element-5a7c772 elementor-align-left elementor-widget elementor-widget-button" data-id="5a7c772" data-element_type="widget" data-e-type="widget" data-widget_type="button.default">
+<div class="elementor-widget-container">
+<div class="elementor-button-wrapper">
+<a class="elementor-button elementor-button-link elementor-size-sm" href={url}>
+<span class="elementor-button-content-wrapper">
+<span class="elementor-button-text">Read More</span>
+</span>
+</a>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>

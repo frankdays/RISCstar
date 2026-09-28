@@ -1,0 +1,34 @@
+[
+  {
+    "slug": "arm",
+    "name": "Arm"
+  },
+  {
+    "slug": "linux-kernel",
+    "name": "Linux Kernel"
+  },
+  {
+    "slug": "news",
+    "name": "News"
+  },
+  {
+    "slug": "open-source",
+    "name": "Open Source"
+  },
+  {
+    "slug": "performance",
+    "name": "Performance"
+  },
+  {
+    "slug": "power-management",
+    "name": "Power Management"
+  },
+  {
+    "slug": "risc-v",
+    "name": "RISC-V"
+  },
+  {
+    "slug": "security",
+    "name": "Security"
+  }
+]

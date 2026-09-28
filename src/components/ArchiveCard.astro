@@ -1,0 +1,28 @@
+---
+// Post card on category/date archives — mirrors Elementor archive-posts "classic" skin.
+import { type Post, postUrl, fmtLong, excerpt, categoryClasses } from '../lib/blog';
+interface Props { post: Post; eager?: boolean }
+const { post, eager = false } = Astro.props;
+const d = post.data;
+const url = postUrl(post);
+---
+<article class={`elementor-post elementor-grid-item post type-post status-publish format-standard has-post-thumbnail hentry ${categoryClasses(post)}`} role="listitem">
+<a class="elementor-post__thumbnail__link" href={url} tabindex="-1">
+<div class="elementor-post__thumbnail"><img fetchpriority={eager ? 'high' : undefined} loading={eager ? undefined : 'lazy'} decoding="async" width={d.imageWidth} height={d.imageHeight} src={d.image} class="attachment-full size-full" alt={d.imageAlt} /></div>
+</a>
+<div class="elementor-post__text">
+<h3 class="elementor-post__title">
+<a href={url}>
+{d.title} </a>
+</h3>
+<div class="elementor-post__meta-data">
+<span class="elementor-post-date">
+{fmtLong(d.date)} </span>
+</div>
+<div class="elementor-post__excerpt">
+<p>{excerpt(post)}</p>
+</div>
+<a class="elementor-post__read-more" href={url} aria-label={`Read more about ${d.title}`} tabindex="-1">
+Read More </a>
+</div>
+</article>

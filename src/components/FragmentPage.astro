@@ -1,0 +1,31 @@
+---
+// Renders a page whose body lives in src/fragments/pages/<page>.html and whose
+// title/SEO/styles live in src/data/pages/<page>.json.
+// A <!--POSTS:n--> marker in the body is replaced with the latest n blog posts.
+import Base from '../layouts/Base.astro';
+import LoopGrid from './LoopGrid.astro';
+import { getPosts, BLOG_PER_PAGE } from '../lib/blog';
+
+const bodies = import.meta.glob<string>('../fragments/pages/*.html', { query: '?raw', import: 'default', eager: true });
+const metas = import.meta.glob<any>('../data/pages/*.json', { import: 'default', eager: true });
+
+interface Props { page: string; blogPage?: number }
+const { page, blogPage } = Astro.props;
+const html = bodies[`../fragments/pages/${page}.html`];
+const meta = metas[`../data/pages/${page}.json`];
+if (!html || !meta) throw new Error(`Unknown page fragment: ${page}`);
+
+const posts = await getPosts();
+const parts = html.split(/<!--POSTS:(\d+)-->/);
+function gridFor(n: number) {
+  if (blogPage !== undefined) {
+    const total = Math.ceil(posts.length / BLOG_PER_PAGE);
+    const start = (blogPage - 1) * BLOG_PER_PAGE;
+    return { posts: posts.slice(start, start + BLOG_PER_PAGE), paging: { current: blogPage, total, base: '/blog/' } };
+  }
+  return { posts: posts.slice(0, n) };
+}
+---
+<Base title={meta.title} head={meta.head} styles={meta.styles} bodyClass={meta.bodyClass} scrollArrow={meta.scrollArrow} header={meta.header} footer={meta.footer}>
+{parts.map((part, i) => (i % 2 === 0 ? <Fragment set:html={part} /> : <LoopGrid {...gridFor(Number(part))} />))}
+</Base>

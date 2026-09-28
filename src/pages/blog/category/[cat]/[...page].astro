@@ -1,0 +1,19 @@
+---
+import ArchivePage from '../../../../components/ArchivePage.astro';
+import { getPosts, allCategories, categoryUrl, ARCHIVE_PER_PAGE } from '../../../../lib/blog';
+
+export async function getStaticPaths() {
+  const posts = await getPosts();
+  return allCategories.flatMap((c) => {
+    const inCat = posts.filter((p) => p.data.categories.includes(c.slug));
+    const total = Math.max(1, Math.ceil(inCat.length / ARCHIVE_PER_PAGE));
+    return Array.from({ length: total }, (_, i) => ({
+      params: { cat: c.slug, page: i === 0 ? undefined : `page/${i + 1}` },
+      props: { cat: c, current: i + 1, total, posts: inCat.slice(i * ARCHIVE_PER_PAGE, (i + 1) * ARCHIVE_PER_PAGE) },
+    }));
+  });
+}
+const { cat, current, total, posts } = Astro.props;
+---
+<ArchivePage heading={`Category: ${cat.name}`} seoName={`${cat.name} Archives`} bodyClass={`archive category category-${cat.slug}`}
+  base={categoryUrl(cat.slug)} posts={posts} current={current} total={total} />

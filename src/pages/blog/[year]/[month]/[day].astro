@@ -1,0 +1,18 @@
+---
+// WordPress day archives (linked from the date on each blog card).
+import ArchivePage from '../../../../components/ArchivePage.astro';
+import { getPosts, dayKey, fmtLong, ARCHIVE_PER_PAGE } from '../../../../lib/blog';
+
+export async function getStaticPaths() {
+  const posts = await getPosts();
+  const days = new Map<string, typeof posts>();
+  for (const p of posts) days.set(dayKey(p.data.date), [...(days.get(dayKey(p.data.date)) ?? []), p]);
+  return [...days].map(([key, list]) => {
+    const [year, month, day] = key.split('/');
+    return { params: { year, month, day }, props: { posts: list.slice(0, ARCHIVE_PER_PAGE), label: fmtLong(list[0].data.date), key } };
+  });
+}
+const { posts, label, key } = Astro.props;
+---
+<ArchivePage heading={`Day: ${label}`} seoName={label} bodyClass="archive date"
+  base={`/blog/${key}/`} posts={posts} current={1} total={1} />

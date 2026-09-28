@@ -1,0 +1,115 @@
+---
+// Blog posts (/blog/<slug>/) and blog listing pages 2..N (/blog/2/).
+import { render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import FragmentPage from '../../components/FragmentPage.astro';
+import LoopGrid from '../../components/LoopGrid.astro';
+import template from '../../fragments/post-template.html?raw';
+import postMeta from '../../data/post.json';
+import { getPosts, postUrl, fmtLong, allCategories, categoryUrl, categoryClasses, BLOG_PER_PAGE, type Post } from '../../lib/blog';
+import { postHead, readingMinutes } from '../../lib/seo';
+
+export async function getStaticPaths() {
+  const posts = await getPosts();
+  const pages = Math.ceil(posts.length / BLOG_PER_PAGE);
+  // "Similar Blogs" on the original site always showed the three oldest posts.
+  const related = [...posts].reverse().slice(0, 3);
+  return [
+    ...posts.map((post, i) => ({
+      params: { slug: post.id },
+      props: { kind: 'post' as const, post, newer: posts[i - 1], older: posts[i + 1], related },
+    })),
+    ...Array.from({ length: pages - 1 }, (_, i) => ({ params: { slug: String(i + 2) }, props: { kind: 'list' as const, n: i + 2 } })),
+  ];
+}
+
+const props = Astro.props as any;
+let view: any = null;
+if (props.kind === 'post') {
+  const { post, newer, older, related } = props as { post: Post; newer?: Post; older?: Post; related: Post[] };
+  const d = post.data;
+  if (!d.redirect) {
+    const { Content } = await render(post);
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    const nav = `<div class="elementor-post-navigation" role="navigation" aria-label="Post Navigation">
+<div class="elementor-post-navigation__prev elementor-post-navigation__link">
+${newer ? `<a href="${postUrl(newer)}" rel="prev"><span class="post-navigation__arrow-wrapper post-navigation__arrow-prev"><i aria-hidden="true" class="fas fa-angle-left"></i><span class="elementor-screen-only">Prev</span></span><span class="elementor-post-navigation__link__prev"><span class="post-navigation__prev--label">Previous</span><span class="post-navigation__prev--title">${esc(newer.data.title)}</span></span></a>` : ''}</div>
+<div class="elementor-post-navigation__separator-wrapper">
+<div class="elementor-post-navigation__separator"></div>
+</div>
+<div class="elementor-post-navigation__next elementor-post-navigation__link">
+${older ? `<a href="${postUrl(older)}" rel="next"><span class="elementor-post-navigation__link__next"><span class="post-navigation__next--label">Next</span><span class="post-navigation__next--title">${esc(older.data.title)}</span></span><span class="post-navigation__arrow-wrapper post-navigation__arrow-next"><i aria-hidden="true" class="fas fa-angle-right"></i><span class="elementor-screen-only">Next</span></span></a>` : ''}</div>
+</div>`;
+    const comments = import.meta.glob<string>('../../data/comments/*.html', { query: '?raw', import: 'default', eager: true })[`../../data/comments/${post.id}.html`];
+    const image = d.image
+      ? `<img fetchpriority="high" decoding="async" width="${d.imageWidth ?? ''}" height="${d.imageHeight ?? ''}" src="${d.image}" class="attachment-full size-full" alt="${esc(d.imageAlt)}">`
+      : '';
+    const avatar = `<img src="${d.authorAvatar ?? 'https://secure.gravatar.com/avatar/?s=96&amp;d=mm&amp;r=g'}" title="" alt="" loading="lazy">`;
+    const categoryList = allCategories.map((c, i) => `<li class="cat-item"><a href="${categoryUrl(c.slug)}">${esc(c.name)}</a>\n</li>`).join('\n');
+    const filled = template
+      .replace('{{POSTCLASSES}}', `post type-post status-publish format-standard has-post-thumbnail hentry ${categoryClasses(post)}`)
+      .replace('{{TITLE}}', esc(d.title))
+      .replace('{{AUTHORURL}}', `/blog/author/${d.authorSlug}/`)
+      .replaceAll('{{AUTHOR}}', esc(d.author))
+      .replace('{{DATE}}', fmtLong(d.date))
+      .replace('{{IMAGE}}', image)
+      .replace('{{POSTNAV}}', nav)
+      .replace('{{COMMENTS}}', comments ?? '')
+      .replaceAll('{{FORMTITLE}}', esc(d.title))
+      .replaceAll('{{POSTURL}}', postUrl(post))
+      .replace('{{AVATAR}}', avatar)
+      .replace('{{AUTHORBIO}}', esc(d.authorBio ?? ''))
+      .replace('{{CATEGORYLIST}}', categoryList);
+    const [beforeBody, rest] = filled.split('{{BODY}}');
+    const [beforeRelated, afterRelated] = rest.split('{{RELATED}}');
+    const title = d.seoTitle ?? `${d.title} - RISCstar`;
+    // Posts migrated from WordPress keep their original Elementor wrapper / HTML.
+    const wrapperHtml = import.meta.glob<string>('../../data/post-wrappers/*.html', { query: '?raw', import: 'default', eager: true })[`../../data/post-wrappers/${post.id}.html`];
+    const rawHtml = import.meta.glob<string>('../../content/blog-html/*.html', { query: '?raw', import: 'default', eager: true })[`../../content/blog-html/${post.id}.html`];
+    view = {
+      Content, beforeBody, beforeRelated, afterRelated, related, title,
+      wrapper: wrapperHtml?.split('{{CONTENT}}'), raw: rawHtml, classic: d.classic,
+      styles: [...postMeta.styles, ...(d.legacyStyles ?? [])], scripts: d.legacyScripts ?? [],
+      head: postHead({
+        url: postUrl(post), title, description: d.description, published: d.date, modified: d.modified,
+        image: d.image, imageWidth: d.imageWidth, imageHeight: d.imageHeight, author: d.author,
+        readingMinutes: readingMinutes(post.body ?? ''),
+      }),
+      bodyClass: postMeta.bodyClass.replace(/postid-\d+/, '').replace(/single-format-standard/, `single-format-standard postid-${post.id}`),
+    };
+  } else {
+    view = { redirect: d.redirect };
+  }
+}
+---
+{props.kind === 'list' && <FragmentPage page="blog" blogPage={props.n} />}
+{view?.redirect && (
+  <html lang="en-US"><head><meta charset="utf-8" /><title>RISCstar</title>
+  <meta http-equiv="refresh" content={`0; url=${view.redirect}`} />
+  <link rel="canonical" href={`https://riscstar.com${view.redirect}`} /><meta name="robots" content="noindex" /></head>
+  <body><a href={view.redirect}>Continue</a></body></html>
+)}
+{view?.Content && (
+  <Base title={view.title} head={view.head} styles={view.styles} bodyClass={view.bodyClass}>
+    <Fragment set:html={view.beforeBody} />
+    {view.raw ? <Fragment set:html={view.raw} />
+      : view.wrapper ? <><Fragment set:html={view.wrapper[0]} /><view.Content /><Fragment set:html={view.wrapper[1]} /></>
+      : view.classic ? <view.Content />
+      : (
+    <div data-elementor-type="wp-post" class="elementor" data-elementor-post-type="post">
+    <div class="elementor-element post-body-con e-flex e-con-boxed e-con e-parent" data-element_type="container" data-e-type="container">
+    <div class="e-con-inner">
+    <div class="elementor-element elementor-widget elementor-widget-text-editor post-body" data-element_type="widget" data-e-type="widget" data-widget_type="text-editor.default">
+    <div class="elementor-widget-container">
+    <view.Content />
+    </div>
+    </div>
+    </div>
+    </div>
+    </div>)}
+    <Fragment set:html={view.beforeRelated} />
+    <LoopGrid posts={view.related} />
+    <Fragment set:html={view.afterRelated} />
+    {view.scripts.map((src: string) => <script is:inline src={src}></script>)}
+  </Base>
+)}

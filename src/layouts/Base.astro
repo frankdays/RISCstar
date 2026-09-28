@@ -1,0 +1,65 @@
+---
+const headers = import.meta.glob<string>('../fragments/header*.html', { query: '?raw', import: 'default', eager: true });
+const footers = import.meta.glob<string>('../fragments/footer*.html', { query: '?raw', import: 'default', eager: true });
+import site from '../data/site.json';
+import scrollArrow from '../fragments/scroll-arrow.html?raw';
+
+interface Props {
+  title: string;
+  /** Extra <head> markup: meta description, canonical, Open Graph, JSON-LD. */
+  head?: string;
+  /** Stylesheets for this page, in cascade order. */
+  styles: string[];
+  bodyClass?: string;
+  /** Bouncing "scroll down" arrow over the hero (Scroll Down Arrow plugin). */
+  scrollArrow?: boolean;
+  /** Page-specific header/footer variant (src/fragments/header-<key>.html), if any. */
+  header?: string;
+  footer?: string;
+}
+const { title, head = '', styles, bodyClass = '', scrollArrow: showArrow = false, header: headerKey, footer: footerKey } = Astro.props;
+const header = headers[`../fragments/header${headerKey ? '-' + headerKey : ''}.html`];
+const footer = footers[`../fragments/footer${footerKey ? '-' + footerKey : ''}.html`];
+
+// Highlight the current top-level menu item, as WordPress did.
+const path = Astro.url.pathname;
+const headerHtml = header.replace(
+  /(<div id="[^"]*" class="e-n-menu-title)(">\s*<a class="e-n-menu-title-container[^"]*" href="([^"]+)")/g,
+  (m, a, b, href) => (href === path ? `${a} e-current${b} aria-current="page"` : m),
+);
+---
+<!doctype html>
+<html lang="en-US">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title}</title>
+<Fragment set:html={head} />
+<link rel="stylesheet" href="/css/wp-global.css">
+{styles.map((href) => <link rel="stylesheet" href={href} media="all">)}
+<link rel="stylesheet" href="/css/loop-559.css">
+<link rel="stylesheet" href="/css/site.css">
+<link rel="alternate" type="application/rss+xml" title="RISCstar &raquo; Feed" href="https://riscstar.com/feed/">
+<Fragment set:html={site.favicons} />
+<!-- Google Analytics -->
+<script is:inline async src="https://www.googletagmanager.com/gtag/js?id=G-0DNZ1PLLQP"></script>
+<script is:inline>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-0DNZ1PLLQP');
+</script>
+<!-- Leadfeeder -->
+<script is:inline>(function(ss,ex){ window.ldfdr=window.ldfdr||function(){(ldfdr._q=ldfdr._q||[]).push([].slice.call(arguments));};(function(d,s){ fs=d.getElementsByTagName(s)[0]; function ce(src){ var cs=d.createElement(s); cs.src=src; cs.async=1; fs.parentNode.insertBefore(cs,fs); };ce('https://sc.lfeeder.com/lftracker_v1_'+ss+(ex?'_'+ex:'')+'.js'); })(document,'script'); })('YEgkB8lLvbw8ep3Z');</script>
+<!-- Albacross -->
+<script is:inline>window._nQc="89734228";</script>
+<script is:inline async src="https://serve.albacross.com/track.js"></script>
+</head>
+<body class={bodyClass}>
+<Fragment set:html={headerHtml} />
+<slot />
+<Fragment set:html={footer} />
+{showArrow && <Fragment set:html={scrollArrow} />}
+<script is:inline src="/js/site.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+---
+// WordPress/Elementor numbered pagination.
+import { pageHref } from '../lib/blog';
+interface Props { current: number; total: number; base: string; style: 'blog' | 'archive' }
+const { current, total, base, style } = Astro.props;
+const href = (n: number) => pageHref(base, n, style);
+const pages = Array.from({ length: total }, (_, i) => i + 1);
+---
+<div class="e-load-more-anchor" data-page={current} data-max-page={total} data-next-page={'https://riscstar.com' + (style === 'blog' ? `${base}${current + 1}/` : `${base}page/${current + 1}/`)}></div>
+<nav class="elementor-pagination" aria-label="Pagination">
+{current > 1 ? <a class="page-numbers prev" href={href(current - 1)}>Previous</a> : <span class="page-numbers prev">Previous</span>}
+{pages.map((n) => n === current
+  ? <span aria-current="page" class="page-numbers current"><span class="elementor-screen-only">Page</span>{n}</span>
+  : <a class="page-numbers" href={href(n)}><span class="elementor-screen-only">Page</span>{n}</a>)}
+{current < total ? <a class="page-numbers next" href={href(current + 1)}>Next</a> : <span class="page-numbers next">Next</span>}
+</nav>

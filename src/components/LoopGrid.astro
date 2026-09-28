@@ -1,0 +1,11 @@
+---
+import LoopCard from './LoopCard.astro';
+import Pagination from './Pagination.astro';
+import type { Post } from '../lib/blog';
+interface Props { posts: Post[]; paging?: { current: number; total: number; base: string } }
+const { posts, paging } = Astro.props;
+---
+<div class="elementor-loop-container elementor-grid" role="list">
+{posts.map((p, i) => <LoopCard post={p} eager={i === 0} />)}
+</div>
+{paging && paging.total > 1 && <Pagination {...paging} style="blog" />}

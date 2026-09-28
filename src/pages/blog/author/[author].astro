@@ -1,0 +1,12 @@
+---
+// WordPress author archives redirected to the homepage; keep that behaviour.
+import { getPosts } from '../../../lib/blog';
+export async function getStaticPaths() {
+  const slugs = new Set((await getPosts()).map((p) => p.data.authorSlug));
+  return [...slugs].map((author) => ({ params: { author } }));
+}
+---
+<!doctype html>
+<html lang="en-US"><head><meta charset="utf-8"><title>RISCstar</title>
+<meta http-equiv="refresh" content="0; url=/"><link rel="canonical" href="https://riscstar.com/"><meta name="robots" content="noindex"></head>
+<body><a href="/">RISCstar</a></body></html>

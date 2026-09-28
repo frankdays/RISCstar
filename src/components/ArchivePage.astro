@@ -1,0 +1,38 @@
+---
+// Category and date archives — mirrors Elementor archive template 2127.
+import Base from '../layouts/Base.astro';
+import ArchiveCard from './ArchiveCard.astro';
+import Pagination from './Pagination.astro';
+import template from '../fragments/archive-template.html?raw';
+import archive from '../data/archive.json';
+import { archiveHead } from '../lib/seo';
+import { pageHref, type Post } from '../lib/blog';
+
+interface Props {
+  heading: string;      // e.g. "Category: RISC-V"
+  seoName: string;      // e.g. "RISC-V Archives"
+  bodyClass: string;    // archive-type classes, e.g. "archive category category-risc-v"
+  base: string;         // first-page URL
+  posts: Post[];        // posts on this page
+  current: number;
+  total: number;
+}
+const { heading, seoName, bodyClass, base, posts, current, total } = Astro.props;
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const [before, after] = template.replace('{{TITLE}}', esc(heading)).split('{{POSTS}}');
+const title = `${seoName}${total > 1 && current > 1 ? ` - Page ${current} of ${total}` : ''} - RISCstar`;
+const head = archiveHead({
+  url: pageHref(base, current, 'archive'), firstUrl: base, title,
+  prev: current > 1 ? pageHref(base, current - 1, 'archive') : undefined,
+  next: current < total ? pageHref(base, current + 1, 'archive') : undefined,
+});
+const cls = archive.bodyClass.replace(/^archive category category-[a-z0-9-]+ category-\d+/, bodyClass);
+---
+<Base title={title} head={head} styles={archive.styles} bodyClass={cls}>
+<Fragment set:html={before} />
+<div class="elementor-posts-container elementor-posts elementor-posts--skin-classic elementor-grid elementor-has-item-ratio" role="list">
+{posts.map((p, i) => <ArchiveCard post={p} eager={i === 0} />)}
+</div>
+{total > 1 && <Pagination current={current} total={total} base={base} style="archive" />}
+<Fragment set:html={after} />
+</Base>
