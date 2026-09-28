@@ -39,7 +39,7 @@
     var video = el.querySelector(':scope > .elementor-background-video-container video, :scope > .e-con-inner > .elementor-background-video-container video')
       || el.querySelector('.elementor-background-video-container video');
     if (!video || !s.background_video_link) return;
-    var src = s.background_video_link.replace(/^https?:\/\/riscstar\.com/, '');
+    var src = (document.documentElement.getAttribute('data-base') || '') + s.background_video_link.replace(/^https?:\/\/riscstar\.com/, '');
     if (s.background_video_start) src += '#t=' + s.background_video_start + (s.background_video_end ? ',' + s.background_video_end : '');
     video.src = src;
     video.muted = true;
